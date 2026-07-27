@@ -2,3 +2,8 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Only package-lock.json is authoritative: CI and update-plugins.sh both
+# install with `npm ci`. A second, unvalidated lockfile can silently drift.
+bun.lock
+bun.lockb
