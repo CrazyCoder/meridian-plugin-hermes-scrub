@@ -23,13 +23,17 @@ describe("hermes-scrub plugin", () => {
     expect(typeof plugin.onRequest).toBe("function")
   })
 
-  test("onRequest neutralizes fingerprint tokens while preserving guidance", () => {
+  test("onRequest removes the harness block and neutralizes surviving identifiers", () => {
     const result = plugin.onRequest!(ctx(HERMES_SYSTEM))
-    // Fingerprinting identifiers are broken...
-    expect(result.systemContext).not.toMatch(/\bsession_search\b/)
-    expect(result.systemContext).toContain("session search")
-    // ...but guidance blocks are preserved (no deletion), unlike the old plugin.
-    expect(result.systemContext).toContain("# Finishing the job")
+    // Pass 1 — the harness block (and the memory paragraph inside it) is gone.
+    expect(result.systemContext).not.toContain("# Finishing the job")
+    expect(result.systemContext).not.toContain("You have persistent memory across sessions")
+    // Pass 2 — identifiers that pass 1 deliberately preserves (persona
+    // paragraph, "## Skills (mandatory)") no longer leak in snake_case form.
+    expect(result.systemContext).not.toMatch(/\bskill_view\b/)
+    expect(result.systemContext).not.toMatch(/\bskill_manage\b/)
+    expect(result.systemContext).toContain("skill view(name=")
+    // The persona itself is untouched.
     expect(result.systemContext).toContain("You run on Hermes Agent (by Nous Research)")
   })
 

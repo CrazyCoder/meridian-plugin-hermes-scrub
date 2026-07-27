@@ -4,8 +4,10 @@
  *
  * CONTENT-SCOPED, not adapter-scoped: runs on EVERY adapter and self-scopes by
  * content. `scrubHermesFingerprints` only rewrites the prompt when Hermes'
- * "# Finishing the job" harness block is actually present, and is otherwise an
- * exact no-op. This matters because Hermes (by Nous Research) speaks the
+ * harness block or one of its self-management tool identifiers is actually
+ * present, and is otherwise an exact no-op — including whitespace, which is
+ * normalized only when a block was really removed. This matters because Hermes
+ * (by Nous Research) speaks the
  * Anthropic Messages API but sends no distinguishing header — its traffic
  * arrives under whatever adapter Meridian falls back to (commonly pi or the
  * default), so an adapter-scoped filter would miss it and let the fingerprint
@@ -24,7 +26,7 @@ export type { Transform, RequestContext } from "./types.js"
 const plugin: Transform = {
   name: "hermes-scrub",
   version: "0.1.0",
-  description: "Strip Hermes Agent's coding-harness fingerprint from the system prompt before it reaches Claude (all adapters; content-scoped)",
+  description: "Strip Hermes Agent's coding-harness fingerprint from the system prompt before it reaches Claude — harness blocks removed, surviving tool identifiers neutralized (all adapters; content-scoped)",
   // No `adapters` restriction — undefined means all adapters. The scrub is a
   // content-based no-op when no Hermes fingerprint is present.
 

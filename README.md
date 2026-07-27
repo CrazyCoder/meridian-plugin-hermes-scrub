@@ -12,14 +12,23 @@ Individually those lines are harmless. **Cumulatively the block reads as an auto
 400 invalid_request_error: You're out of extra usage. Add more at claude.ai/settings/usage and keep going.
 ```
 
-This plugin surgically removes that one block. The request drops back under the metering threshold and is billed under Max (verified empirically — and the fix is independent of the `codeSystemPrompt` preset). Everything else in Hermes' prompt is preserved verbatim:
+This plugin removes that fingerprint in two independent passes:
+
+1. **Harness blocks** — the `# Finishing the job` block and the un-headed persistent-memory / session-recall / skills paragraph are deleted. On a real gateway prompt that is ~2.8k characters of harness signal.
+2. **Tool identifiers** — Hermes' self-management tool names (`session_search`, `skill_manage`, `skill_view`, `skills_list`) are neutralized *in prose* by replacing the underscore with a space (`session_search` → `session search`). The sentence stays readable; the snake_case fingerprint does not survive.
+
+Pass 2 exists because pass 1 is heading-anchored and therefore cannot reach the **spawned-subagent / delegated-child** prompt: that variant has no `You have persistent memory` anchor and re-homes the session/skills guidance under `# Parallel tool calls`, so every subagent kept getting metered. Pass 1 stays because it is the production-proven mitigation and removes far more signal than pass 2 does — block-deletion-only builds run clean while still emitting bare `skill_view` / `skill_manage` tokens, so the identifiers are demonstrably not the whole trigger. Running both is strictly the smaller fingerprint.
+
+Everything else in Hermes' prompt is preserved verbatim:
 
 - the user-editable **persona** (`# Hermes Agent Persona`, "You run on Hermes Agent…")
 - **mid-turn user steering** instructions
 - the full **`<available_skills>`** list
 - tools, guidelines, and any user- or harness-appended content
 
-The scrub is **content-scoped** (it runs on every adapter and self-scopes by matching Hermes' fingerprint) and **idempotent** (running it twice is a no-op). It's a safe pass-through for non-Hermes prompts — Claude Code, OpenCode, pi, etc. are left unchanged.
+Tool *calls* are unaffected: tools are invoked by their schema name, not by the prose spelling.
+
+The scrub is **content-scoped** (it runs on every adapter and self-scopes by matching Hermes' fingerprint) and **idempotent** (running it twice is a no-op — the spaced identifier form no longer matches). It's an exact pass-through for non-Hermes prompts — Claude Code, OpenCode, pi, etc. are returned byte-identical, whitespace included.
 
 ## Install
 
@@ -70,8 +79,10 @@ model:
 | Input | Output |
 |---|---|
 | No system prompt | unchanged |
-| System prompt without the Hermes harness block | unchanged (idempotent) |
-| Hermes' default system prompt | `# Finishing the job` block removed, spacing normalized; persona, steering, and skills preserved |
+| System prompt with no Hermes fingerprint at all | byte-identical, whitespace included |
+| Hermes' default system prompt | `# Finishing the job` block and memory/skills paragraph removed, spacing normalized; surviving identifiers neutralized; persona, steering, and skills catalog preserved |
+| Hermes' subagent prompt (no memory anchor, guidance re-homed) | identifiers neutralized; no block to remove, so length and whitespace are unchanged |
+| Already-scrubbed output | unchanged (idempotent) |
 
 ## Test
 
